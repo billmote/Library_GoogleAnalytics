@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.preference.PreferenceManager;
+import android.util.Log;
 
 import com.google.android.apps.analytics.GoogleAnalyticsTracker;
 
@@ -30,23 +31,22 @@ public class AnalyticsUtils {
      * @param uacode
      *            GoogleAnalytics key
      */
-    public static void configure(String uacode) {
+    public static void configure(Context application, String uacode) {
+        Log.d(TAG, "configure()");
         _UACODE = uacode;
+        if (_instance == null) {
+            _instance = new AnalyticsUtils(application);
+        }
     }
 
     /**
      * Returns the global {@link AnalyticsUtils} singleton object, creating one
      * if necessary.
      */
-    public static AnalyticsUtils getInstance(Context context) {
-        if (!ANALYTICS_ENABLED) {
+    public static AnalyticsUtils getInstance() {
+        Log.d(TAG, "getInstance()");
+        if (!ANALYTICS_ENABLED || _instance == null) {
             return sEmptyAnalyticsUtils;
-        }
-        if (_instance == null) {
-            if (context == null) {
-                return sEmptyAnalyticsUtils;
-            }
-            _instance = new AnalyticsUtils(context);
         }
         return _instance;
     }
@@ -57,7 +57,7 @@ public class AnalyticsUtils {
             // This should only occur for the empty AnalyticsUtils object.
             return;
         }
-        _applicationContext = context.getApplicationContext();
+        _applicationContext = context;
         _tracker = GoogleAnalyticsTracker.getInstance();
         // Unfortunately this needs to be synchronous.
         _tracker.start(_UACODE, 300, _applicationContext);
