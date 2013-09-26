@@ -1,6 +1,6 @@
 package com.androidfu.library.googleanalytics;
 
-import android.content.Context;
+import android.app.Application;
 import android.content.SharedPreferences;
 import android.os.AsyncTask;
 import android.os.Build;
@@ -14,29 +14,37 @@ import com.google.android.apps.analytics.GoogleAnalyticsTracker;
  */
 public class AnalyticsUtils {
 
-    @SuppressWarnings("unused")
     private static final String TAG = AnalyticsUtils.class.getSimpleName();
-    private static final String FIRST_RUN_KEY = "first_run";
+    private static final String FIRST_RUN_KEY = "firstRun";
+    private static final int NETWORK_TIMEOUT = 300;
     private static final int VISITOR_SCOPE = 1;
-    private static final boolean ANALYTICS_ENABLED = true;
+    private static boolean _analyticsEnabled = true;
     private static AnalyticsUtils _instance;
+    private static String _uaCode;
     private GoogleAnalyticsTracker _tracker;
-    private Context _applicationContext;
-    private static String _UACODE;
 
     /**
      * Call this from your application class before using trackPage() or
      * trackEvent()
      * 
-     * @param uacode
+     * @param uaCode
      *            GoogleAnalytics key
      */
-    public static void configure(Context application, String uacode) {
+    public static void configure(Application application, String uaCode) {
         Log.d(TAG, "configure()");
-        _UACODE = uacode;
+        _uaCode = uaCode;
         if (_instance == null) {
             _instance = new AnalyticsUtils(application);
         }
+    }
+
+    /**
+     * Analytics are enabled by default, but setting them is still the safest bet.
+     * 
+     * @param enabled
+     */
+    public void setAnalyticsEnabled(boolean enabled) {
+        _analyticsEnabled = enabled;
     }
 
     /**
@@ -45,27 +53,29 @@ public class AnalyticsUtils {
      */
     public static AnalyticsUtils getInstance() {
         Log.d(TAG, "getInstance()");
-        if (!ANALYTICS_ENABLED || _instance == null) {
-            return sEmptyAnalyticsUtils;
+        if (!_analyticsEnabled || _instance == null) {
+            return _emptyAnalyticsUtils;
         }
         return _instance;
     }
 
+    /**
+     * Our primary constructor.
+     * 
+     * @param application
+     */
     @SuppressWarnings("deprecation")
-    private AnalyticsUtils(Context context) {
-        if (context == null) {
+    private AnalyticsUtils(Application application) {
+        if (application == null) {
             // This should only occur for the empty AnalyticsUtils object.
             return;
         }
-        _applicationContext = context;
         _tracker = GoogleAnalyticsTracker.getInstance();
         // Unfortunately this needs to be synchronous.
-        _tracker.start(_UACODE, 300, _applicationContext);
-        //Log.d(TAG, "Initializing Analytics");
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(_applicationContext);
+        _tracker.start(_uaCode, NETWORK_TIMEOUT, application);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(application);
         final boolean firstRun = prefs.getBoolean(FIRST_RUN_KEY, true);
         if (firstRun) {
-            //Log.d(TAG, "Analytics firstRun");
             String apiLevel = Build.VERSION.SDK;
             String model = Build.MODEL;
             _tracker.setCustomVar(1, "apiLevel", apiLevel, VISITOR_SCOPE);
@@ -74,6 +84,14 @@ public class AnalyticsUtils {
         }
     }
 
+    /**
+     * Track an event.
+     * 
+     * @param category
+     * @param action
+     * @param label
+     * @param value
+     */
     public void trackEvent(final String category, final String action, final String label, final int value) {
         // We wrap the call in an AsyncTask since the Google Analytics library
         // writes to disk on its calling thread.
@@ -83,17 +101,21 @@ public class AnalyticsUtils {
             protected Void doInBackground(Void... voids) {
                 try {
                     _tracker.trackEvent(category, action, label, value);
-                    //Log.d(TAG, "Analytics trackEvent: " + category + " / " + action + " / " + label + " / " + value);
                 } catch (Exception e) {
                     // We don't want to crash if there's an Analytics library
                     // exception.
-                    //Log.w(TAG, "Analytics trackEvent error: " + category + " / " + action + " / " + label + " / " + value, e);
+                    Log.e(TAG, "Analytics trackEvent error: " + category + " / " + action + " / " + label + " / " + value, e);
                 }
                 return null;
             }
         }.execute();
     }
 
+    /**
+     * Track a page view.
+     * 
+     * @param path
+     */
     public void trackPageView(final String path) {
         // We wrap the call in an AsyncTask since the Google Analytics library
         // writes to disk on its calling thread.
@@ -103,11 +125,10 @@ public class AnalyticsUtils {
             protected Void doInBackground(Void... voids) {
                 try {
                     _tracker.trackPageView(path);
-                    //Log.d(TAG, "Analytics trackPageView: " + path);
                 } catch (Exception e) {
                     // We don't want to crash if there's an Analytics library
                     // exception.
-                    //Log.w(TAG, "Analytics trackPageView error: " + path, e);
+                    Log.e(TAG, "Analytics trackPageView error: " + path, e);
                 }
                 return null;
             }
@@ -118,7 +139,7 @@ public class AnalyticsUtils {
      * Empty instance for use when Analytics is disabled or there was no Context
      * available.
      */
-    private static AnalyticsUtils sEmptyAnalyticsUtils = new AnalyticsUtils(null) {
+    private static AnalyticsUtils _emptyAnalyticsUtils = new AnalyticsUtils(null) {
 
         @Override
         public void trackEvent(String category, String action, String label, int value) {
