@@ -31,7 +31,9 @@ public class AnalyticsUtils {
      *            GoogleAnalytics key
      */
     public static void configure(Application application, String uaCode) {
-        Log.d(TAG, "configure()");
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "configure()");
+        }
         _uaCode = uaCode;
         if (_instance == null) {
             _instance = new AnalyticsUtils(application);
@@ -52,8 +54,13 @@ public class AnalyticsUtils {
      * if necessary.
      */
     public static AnalyticsUtils getInstance() {
-        Log.d(TAG, "getInstance()");
-        if (!_analyticsEnabled || _instance == null) {
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "getInstance()");
+        }
+        if (_instance == null) {
+            throw new ClassCastException("You must call configure() first.");
+        }
+        if (!_analyticsEnabled) {
             return _emptyAnalyticsUtils;
         }
         return _instance;
